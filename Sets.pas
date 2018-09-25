@@ -6,7 +6,7 @@ unit Sets;
 ///  Written by Dennis Göhlert                                               ///
 ///  Licensed under Mozilla Public License (MPL) 2.0                         ///
 ///                                                                          ///
-///  Last modified: 25.09.2018 01:37                                         ///
+///  Last modified: 25.09.2018 14:36                                         ///
 ///  (c) 2018 All rights reserved                                            ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -26,25 +26,33 @@ type
     FMax: Integer;
   private
     FElements: TBytes;
-    procedure Initialize;
-    function ElementByteIndex(const AElement: T): Int64;
-    function ElementBitIndex(const AElement: T): Byte;
+    procedure Initialize; inline;
+    function ElementByteIndex(const AElement: T): Int64; inline;
+    function ElementBitIndex(const AElement: T): Byte; inline;
   public
     class constructor Create;
-    function GetEnumerator: TSetEnumerator<T>;
+    function GetEnumerator: TSetEnumerator<T>; inline;
     /// <summary>
     ///   Includes an element in the set
     /// </summary>
-    procedure Include(const AElement: T);
+    procedure Include(const AElement: T); inline;
     /// <summary>
     ///   Excludes an element from the set
     /// </summary>
-    procedure Exclude(const AElement: T);
-    class operator Equal(AFirst, ASecond: TSet<T>): Boolean;
-    class operator NotEqual(AFirst, ASecond: TSet<T>): Boolean;
-    class operator Add(AFirst, ASecond: TSet<T>): TSet<T>;
-    class operator Subtract(AFirst, ASecond: TSet<T>): TSet<T>;
-    class operator In(AElement: T; ASet: TSet<T>): Boolean;
+    procedure Exclude(const AElement: T); inline;
+    /// <summary>
+    ///   Checks if the set is distinct from another one
+    /// </summary>
+    function Distinct(const ASet: TSet<T>): Boolean; inline;
+    class operator Implicit(const AArray: TArray<T>): TSet<T>; inline;
+    class operator LogicalNot(const ASet: TSet<T>): TSet<T>; inline;
+    class operator Equal(const AFirst, ASecond: TSet<T>): Boolean; inline;
+    class operator NotEqual(const AFirst, ASecond: TSet<T>): Boolean; inline;
+    class operator GreaterThanOrEqual(const AFirst, ASecond: TSet<T>): Boolean; inline;
+    class operator LessThanOrEqual(const AFirst, ASecond: TSet<T>): Boolean; inline;
+    class operator Add(const AFirst, ASecond: TSet<T>): TSet<T>; inline;
+    class operator Subtract(const AFirst, ASecond: TSet<T>): TSet<T>; inline;
+    class operator In(const AElement: T; const ASet: TSet<T>): Boolean; inline;
   end;
 
   TSetEnumerator<T> = class
@@ -61,7 +69,7 @@ implementation
 
 { TSet }
 
-class operator TSet<T>.Add(AFirst, ASecond: TSet<T>): TSet<T>;
+class operator TSet<T>.Add(const AFirst, ASecond: TSet<T>): TSet<T>;
 var
   Index: Integer;
 begin
@@ -93,6 +101,11 @@ begin
   end;
 end;
 
+function TSet<T>.Distinct(const ASet: TSet<T>): Boolean;
+begin
+  Result := Self = not ASet;
+end;
+
 function TSet<T>.ElementBitIndex(const AElement: T): Byte;
 begin
   Result := (TValue.From<T>(AElement).AsOrdinal - FMin) mod 8;
@@ -103,7 +116,7 @@ begin
   Result := (TValue.From<T>(AElement).AsOrdinal - FMin) div 8;
 end;
 
-class operator TSet<T>.Equal(AFirst, ASecond: TSet<T>): Boolean;
+class operator TSet<T>.Equal(const AFirst, ASecond: TSet<T>): Boolean;
 begin
   AFirst.Initialize;
   ASecond.Initialize;
@@ -124,7 +137,33 @@ begin
   Result := TSetEnumerator<T>.Create(Self);
 end;
 
-class operator TSet<T>.In(AElement: T; ASet: TSet<T>): Boolean;
+class operator TSet<T>.GreaterThanOrEqual(const AFirst,
+  ASecond: TSet<T>): Boolean;
+var
+  Index: Integer;
+begin
+  AFirst.Initialize;
+  for Index := Low(ASecond.FElements) to High(ASecond.FElements) do
+  begin
+    if AFirst.FElements[Index] and ASecond.FElements[Index] <> ASecond.FElements[Index] then
+    begin
+      Exit(False);
+    end;
+  end;
+  Result := True;
+end;
+
+class operator TSet<T>.Implicit(const AArray: TArray<T>): TSet<T>;
+var
+  Current: T;
+begin
+  for Current in AArray do
+  begin
+    Result.Include(Current);
+  end;
+end;
+
+class operator TSet<T>.In(const AElement: T; const ASet: TSet<T>): Boolean;
 var
   BitIndex: Byte;
 begin
@@ -150,12 +189,39 @@ begin
   end;
 end;
 
-class operator TSet<T>.NotEqual(AFirst, ASecond: TSet<T>): Boolean;
+class operator TSet<T>.LessThanOrEqual(const AFirst, ASecond: TSet<T>): Boolean;
+var
+  Index: Integer;
+begin
+  ASecond.Initialize;
+  for Index := Low(AFirst.FElements) to High(AFirst.FElements) do
+  begin
+    if ASecond.FElements[Index] and AFirst.FElements[Index] <> AFirst.FElements[Index] then
+    begin
+      Exit(False);
+    end;
+  end;
+  Result := True;
+end;
+
+class operator TSet<T>.LogicalNot(const ASet: TSet<T>): TSet<T>;
+var
+  Index: Integer;
+begin
+  Result.Initialize;
+  ASet.Initialize;
+  for Index := Low(Result.FElements) to High(Result.FElements) do
+  begin
+    Result.FElements[Index] := not ASet.FElements[Index];
+  end;
+end;
+
+class operator TSet<T>.NotEqual(const AFirst, ASecond: TSet<T>): Boolean;
 begin
   Result := not (AFirst = ASecond);
 end;
 
-class operator TSet<T>.Subtract(AFirst, ASecond: TSet<T>): TSet<T>;
+class operator TSet<T>.Subtract(const AFirst, ASecond: TSet<T>): TSet<T>;
 var
   Index: Integer;
 begin
