@@ -62,7 +62,7 @@ type
   public
     property Current: T read FCurrent;
     constructor Create(ASet: TSet<T>);
-    function MoveNext: Boolean;
+    function MoveNext: Boolean; inline;
   end;
 
 implementation
