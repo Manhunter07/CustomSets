@@ -44,6 +44,10 @@ type
     ///   Checks if the set is distinct from another one
     /// </summary>
     function Distinct(const ASet: TSet<T>): Boolean; inline;
+    /// <summary>
+    ///   Counts the elements in the set
+    /// </summary>
+    function Count: Int64; inline;
     class operator Implicit(const AArray: TArray<T>): TSet<T>; inline;
     class operator LogicalNot(const ASet: TSet<T>): TSet<T>; inline;
     class operator Equal(const AFirst, ASecond: TSet<T>): Boolean; inline;
@@ -79,6 +83,24 @@ begin
   for Index := Low(Result.FElements) to High(Result.FElements) do
   begin
     Result.FElements[Index] := AFirst.FElements[Index] or ASecond.FElements[Index];
+  end;
+end;
+
+function TSet<T>.Count: Int64;
+var
+  ByteIndex: Integer;
+  BitIndex: Byte;
+begin
+  Result := 0;
+  for ByteIndex := Low(FElements) to High(FElements) do
+  begin
+    for BitIndex := 0 to 7 do
+    begin
+      if FElements[ByteIndex] and (1 shl BitIndex) <> 0 then
+      begin
+        Inc(Result);
+      end;
+    end;
   end;
 end;
 
@@ -169,7 +191,7 @@ var
 begin
   ASet.Initialize;
   BitIndex := ASet.ElementBitIndex(AElement);
-  Result := (ASet.FElements[ASet.ElementByteIndex(AElement)] and (1 shl BitIndex)) = (1 shl BitIndex);
+  Result := (ASet.FElements[ASet.ElementByteIndex(AElement)] and (1 shl BitIndex)) <> 0;
 end;
 
 procedure TSet<T>.Include(const AElement: T);
@@ -245,7 +267,7 @@ end;
 function TSetEnumerator<T>.MoveNext: Boolean;
 begin
   repeat
-    FCurrent := TValue.FromOrdinal(TypeInfo(T), TValue.From<T>(FCurrent).AsOrdinal + 1).AsType<T>;
+    FCurrent := TValue.FromOrdinal(TypeInfo(T), Succ(TValue.From<T>(FCurrent).AsOrdinal)).AsType<T>;
     if FCurrent in FSet then
     begin
       Exit(True);
