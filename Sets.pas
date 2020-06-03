@@ -6,8 +6,8 @@ unit Sets;
 ///  Written by Dennis Göhlert                                               ///
 ///  Licensed under Mozilla Public License (MPL) 2.0                         ///
 ///                                                                          ///
-///  Last modified: 25.09.2018 14:36                                         ///
-///  (c) 2018 All rights reserved                                            ///
+///  Last modified: 03.06.2020 13:47                                         ///
+///  (c) 2018-2020 All rights reserved                                            ///
 ////////////////////////////////////////////////////////////////////////////////
 
 interface
@@ -16,7 +16,7 @@ uses
   System.SysUtils, System.Math, System.Rtti;
 
 type
-  EInvalidSetType = class(Exception);
+  ESetTypeException = class(Exception);
 
   TSetEnumerator<T> = class;
 
@@ -26,7 +26,6 @@ type
     FMax: Integer;
   private
     FElements: TBytes;
-    procedure Initialize; inline;
     function ElementByteIndex(const AElement: T): Int64; inline;
     function ElementBitIndex(const AElement: T): Byte; inline;
   public
@@ -48,6 +47,8 @@ type
     ///   Counts the elements in the set
     /// </summary>
     function Count: Int64; inline;
+    class operator Initialize(out ASet: TSet<T>);
+    class operator Assign(var ADestination, ASource: TSet<T>); inline;
     class operator Implicit(const AArray: TArray<T>): TSet<T>; inline;
     class operator LogicalNot(const ASet: TSet<T>): TSet<T>; inline;
     class operator Equal(const AFirst, ASecond: TSet<T>): Boolean; inline;
@@ -77,13 +78,15 @@ class operator TSet<T>.Add(const AFirst, ASecond: TSet<T>): TSet<T>;
 var
   Index: Integer;
 begin
-  Result.Initialize;
-  AFirst.Initialize;
-  ASecond.Initialize;
   for Index := Low(Result.FElements) to High(Result.FElements) do
   begin
     Result.FElements[Index] := AFirst.FElements[Index] or ASecond.FElements[Index];
   end;
+end;
+
+class operator TSet<T>.Assign(var ADestination, ASource: TSet<T>);
+begin
+  ADestination.FElements := Copy(ASource.FElements);
 end;
 
 function TSet<T>.Count: Int64;
@@ -114,7 +117,7 @@ begin
     RttiType := RttiContext.GetType(TypeInfo(T));
     if not RttiType.IsOrdinal then
     begin
-      raise EInvalidSetType.Create('Ordinal type expected');
+      raise ESetTypeException.Create('Ordinal type expected');
     end;
     FMin := RttiType.AsOrdinal.MinValue;
     FMax := RttiType.AsOrdinal.MaxValue;
@@ -124,8 +127,17 @@ begin
 end;
 
 function TSet<T>.Distinct(const ASet: TSet<T>): Boolean;
+var
+  Index: Integer;
 begin
-  Result := Self = not ASet;
+  for Index := Low(FElements) to High(FElements) do
+  begin
+    if FElements[Index] and ASet.FElements[Index] <> 0 then
+    begin
+      Exit(False);
+    end;
+  end;
+  Result := True;
 end;
 
 function TSet<T>.ElementBitIndex(const AElement: T): Byte;
@@ -140,8 +152,6 @@ end;
 
 class operator TSet<T>.Equal(const AFirst, ASecond: TSet<T>): Boolean;
 begin
-  AFirst.Initialize;
-  ASecond.Initialize;
   Result := CompareMem(AFirst.FElements, ASecond.FElements, Length(AFirst.FElements));
 end;
 
@@ -149,7 +159,6 @@ procedure TSet<T>.Exclude(const AElement: T);
 var
   ByteIndex: Int64;
 begin
-  Initialize;
   ByteIndex := ElementByteIndex(AElement);
   FElements[ByteIndex] := FElements[ByteIndex] and not (1 shl ElementBitIndex(AElement));
 end;
@@ -164,7 +173,6 @@ class operator TSet<T>.GreaterThanOrEqual(const AFirst,
 var
   Index: Integer;
 begin
-  AFirst.Initialize;
   for Index := Low(ASecond.FElements) to High(ASecond.FElements) do
   begin
     if AFirst.FElements[Index] and ASecond.FElements[Index] <> ASecond.FElements[Index] then
@@ -189,7 +197,6 @@ class operator TSet<T>.In(const AElement: T; const ASet: TSet<T>): Boolean;
 var
   BitIndex: Byte;
 begin
-  ASet.Initialize;
   BitIndex := ASet.ElementBitIndex(AElement);
   Result := (ASet.FElements[ASet.ElementByteIndex(AElement)] and (1 shl BitIndex)) <> 0;
 end;
@@ -198,24 +205,19 @@ procedure TSet<T>.Include(const AElement: T);
 var
   ByteIndex: Int64;
 begin
-  Initialize;
   ByteIndex := ElementByteIndex(AElement);
   FElements[ByteIndex] := FElements[ByteIndex] or (1 shl ElementBitIndex(AElement));
 end;
 
-procedure TSet<T>.Initialize;
+class operator TSet<T>.Initialize(out ASet: TSet<T>);
 begin
-  if not Assigned(FElements) then
-  begin
-    SetLength(FElements, Ceil((FMax - FMin) / 8));
-  end;
+  SetLength(ASet.FElements, Ceil((FMax - FMin) / 8));
 end;
 
 class operator TSet<T>.LessThanOrEqual(const AFirst, ASecond: TSet<T>): Boolean;
 var
   Index: Integer;
 begin
-  ASecond.Initialize;
   for Index := Low(AFirst.FElements) to High(AFirst.FElements) do
   begin
     if ASecond.FElements[Index] and AFirst.FElements[Index] <> AFirst.FElements[Index] then
@@ -230,8 +232,6 @@ class operator TSet<T>.LogicalNot(const ASet: TSet<T>): TSet<T>;
 var
   Index: Integer;
 begin
-  Result.Initialize;
-  ASet.Initialize;
   for Index := Low(Result.FElements) to High(Result.FElements) do
   begin
     Result.FElements[Index] := not ASet.FElements[Index];
@@ -247,9 +247,6 @@ class operator TSet<T>.Subtract(const AFirst, ASecond: TSet<T>): TSet<T>;
 var
   Index: Integer;
 begin
-  Result.Initialize;
-  AFirst.Initialize;
-  ASecond.Initialize;
   for Index := Low(Result.FElements) to High(Result.FElements) do
   begin
     Result.FElements[Index] := AFirst.FElements[Index] and not ASecond.FElements[Index];
