@@ -6,8 +6,8 @@ unit Sets;
 ///  Written by Dennis Göhlert                                               ///
 ///  Licensed under Mozilla Public License (MPL) 2.0                         ///
 ///                                                                          ///
-///  Last modified: 03.06.2020 13:47                                         ///
-///  (c) 2018-2020 All rights reserved                                            ///
+///  Last modified: 04.09.2020 12:43                                         ///
+///  (c) 2018-2020 All rights reserved                                       ///
 ////////////////////////////////////////////////////////////////////////////////
 
 interface
@@ -47,6 +47,10 @@ type
     ///   Counts the elements in the set
     /// </summary>
     function Count: Int64; inline;
+    /// <summary>
+    ///   Fills the set by defining all values within a range
+    /// </summary>
+    procedure Fill(const AFrom, ATo: T); inline;
     class operator Initialize(out ASet: TSet<T>);
     class operator Assign(var ADestination, ASource: TSet<T>); inline;
     class operator Implicit(const AArray: TArray<T>): TSet<T>; inline;
@@ -72,7 +76,7 @@ type
 
 implementation
 
-{ TSet }
+{ TSet<T> }
 
 class operator TSet<T>.Add(const AFirst, ASecond: TSet<T>): TSet<T>;
 var
@@ -161,6 +165,18 @@ var
 begin
   ByteIndex := ElementByteIndex(AElement);
   FElements[ByteIndex] := FElements[ByteIndex] and not (1 shl ElementBitIndex(AElement));
+end;
+
+procedure TSet<T>.Fill(const AFrom, ATo: T);
+var
+  FromByteIndex: Int64;
+  ToByteIndex: Int64;
+begin
+  FromByteIndex := ElementByteIndex(AFrom);
+  ToByteIndex := ElementByteIndex(ATo);
+  FillChar(FElements[Succ(FromByteIndex)], Pred(ToByteIndex - FromByteIndex), High(Byte));
+  FElements[FromByteIndex] := FElements[FromByteIndex] or (High(Byte) shl ElementBitIndex(AFrom));
+  FElements[ToByteIndex] := FElements[ToByteIndex] or (High(Byte) shr ElementBitIndex(ATo));
 end;
 
 function TSet<T>.GetEnumerator: TSetEnumerator<T>;
