@@ -6,14 +6,14 @@ unit Sets;
 ///  Written by Dennis Göhlert                                               ///
 ///  Licensed under Mozilla Public License (MPL) 2.0                         ///
 ///                                                                          ///
-///  Last modified: 04.09.2020 12:43                                         ///
+///  Last modified: 09.09.2020 14:00                                         ///
 ///  (c) 2018-2020 All rights reserved                                       ///
 ////////////////////////////////////////////////////////////////////////////////
 
 interface
 
 uses
-  System.SysUtils, System.Math, System.Rtti;
+  System.SysUtils, System.Types, System.Math, System.Rtti;
 
 type
   ESetTypeException = class(Exception);
@@ -28,6 +28,7 @@ type
     FElements: TBytes;
     function ElementByteIndex(const AElement: T): Int64; inline;
     function ElementBitIndex(const AElement: T): Byte; inline;
+    procedure DefineRange(const AFrom, ATo: T; const AValue: Boolean); inline;
   public
     class constructor Create;
     function GetEnumerator: TSetEnumerator<T>; inline;
@@ -48,9 +49,13 @@ type
     /// </summary>
     function Count: Int64; inline;
     /// <summary>
-    ///   Fills the set by defining all values within a range
+    ///   Fills the set by including all values within a range
     /// </summary>
     procedure Fill(const AFrom, ATo: T); inline;
+    /// <summary>
+    ///   Clears the set by excluding all values within a range
+    /// </summary>
+    procedure Clear(const AFrom, ATo: T); inline;
     class operator Initialize(out ASet: TSet<T>);
     class operator Assign(var ADestination, ASource: TSet<T>); inline;
     class operator Implicit(const AArray: TArray<T>): TSet<T>; inline;
@@ -93,6 +98,11 @@ begin
   ADestination.FElements := Copy(ASource.FElements);
 end;
 
+procedure TSet<T>.Clear(const AFrom, ATo: T);
+begin
+  DefineRange(AFrom, ATo, False);
+end;
+
 function TSet<T>.Count: Int64;
 var
   ByteIndex: Integer;
@@ -127,6 +137,29 @@ begin
     FMax := RttiType.AsOrdinal.MaxValue;
   finally
     RttiContext.Free;
+  end;
+end;
+
+procedure TSet<T>.DefineRange(const AFrom, ATo: T; const AValue: Boolean);
+const
+  ByteMasks: array [Boolean] of Byte = (Low(Byte), High(Byte));
+var
+  FromByteIndex: Int64;
+  ToByteIndex: Int64;
+begin
+  FromByteIndex := ElementByteIndex(AFrom);
+  ToByteIndex := ElementByteIndex(ATo);
+  FillChar(FElements[Succ(FromByteIndex)], Pred(ToByteIndex - FromByteIndex), ByteMasks[AValue]);
+  case CompareValue(FromByteIndex, ToByteIndex) of
+    LessThanValue:
+      begin
+        FElements[FromByteIndex] := FElements[FromByteIndex] or (ByteMasks[AValue] shl ElementBitIndex(AFrom));
+        FElements[ToByteIndex] := FElements[ToByteIndex] or (ByteMasks[AValue] shr (7 - ElementBitIndex(ATo)));
+      end;
+    EqualsValue:
+      begin
+        FElements[FromByteIndex] := FElements[FromByteIndex] or ((ByteMasks[AValue] shl ElementBitIndex(AFrom)) and (ByteMasks[AValue] shr (7 - ElementBitIndex(ATo))));
+      end;
   end;
 end;
 
@@ -168,15 +201,8 @@ begin
 end;
 
 procedure TSet<T>.Fill(const AFrom, ATo: T);
-var
-  FromByteIndex: Int64;
-  ToByteIndex: Int64;
 begin
-  FromByteIndex := ElementByteIndex(AFrom);
-  ToByteIndex := ElementByteIndex(ATo);
-  FillChar(FElements[Succ(FromByteIndex)], Pred(ToByteIndex - FromByteIndex), High(Byte));
-  FElements[FromByteIndex] := FElements[FromByteIndex] or (High(Byte) shl ElementBitIndex(AFrom));
-  FElements[ToByteIndex] := FElements[ToByteIndex] or (High(Byte) shr ElementBitIndex(ATo));
+  DefineRange(AFrom, ATo, True);
 end;
 
 function TSet<T>.GetEnumerator: TSetEnumerator<T>;
@@ -184,8 +210,7 @@ begin
   Result := TSetEnumerator<T>.Create(Self);
 end;
 
-class operator TSet<T>.GreaterThanOrEqual(const AFirst,
-  ASecond: TSet<T>): Boolean;
+class operator TSet<T>.GreaterThanOrEqual(const AFirst, ASecond: TSet<T>): Boolean;
 var
   Index: Integer;
 begin
