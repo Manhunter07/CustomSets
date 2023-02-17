@@ -6,8 +6,8 @@ unit Sets;
 ///  Written by Dennis Göhlert                                               ///
 ///  Licensed under Mozilla Public License (MPL) 2.0                         ///
 ///                                                                          ///
-///  Last modified: 09.09.2020 14:00                                         ///
-///  (c) 2018-2020 All rights reserved                                       ///
+///  Last modified: 17.02.2023 20:30                                         ///
+///  (c) 2018-2023 All rights reserved                                       ///
 ////////////////////////////////////////////////////////////////////////////////
 
 interface
@@ -22,8 +22,8 @@ type
 
   TSet<T> = record
   private class var
-    FMin: Integer;
-    FMax: Integer;
+    FMin: Int64;
+    FMax: Int64;
   private
     FElements: TBytes;
     function ElementByteIndex(const AElement: T): Int64; inline;
@@ -129,12 +129,25 @@ begin
   RttiContext := TRttiContext.Create;
   try
     RttiType := RttiContext.GetType(TypeInfo(T));
-    if not RttiType.IsOrdinal then
+    if RttiType.IsOrdinal then
     begin
-      raise ESetTypeException.Create('Ordinal type expected');
+      FMin := RttiType.AsOrdinal.MinValue;
+      FMax := RttiType.AsOrdinal.MaxValue;
+    end else
+    begin
+      if RttiType is TRttiInt64Type then
+      begin
+        FMin := (RttiType as TRttiInt64Type).MinValue;
+        FMax := (RttiType as TRttiInt64Type).MaxValue;
+      end else
+      begin
+        raise ESetTypeException.Create('Ordinal type expected');
+      end;
     end;
-    FMin := RttiType.AsOrdinal.MinValue;
-    FMax := RttiType.AsOrdinal.MaxValue;
+    if (FMax - FMin) > (MaxInt - SizeOf(Integer){$IFDEF CPU64BITS} * 2{$ENDIF} - SizeOf(NativeInt)) then
+    begin
+      raise ESetTypeException.Create('Range exceeds size constraints');
+    end;
   finally
     RttiContext.Free;
   end;
