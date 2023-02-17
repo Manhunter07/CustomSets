@@ -122,9 +122,12 @@ begin
 end;
 
 class constructor TSet<T>.Create;
+const
+  MaxArraySize = MaxInt - SizeOf(Integer){$IFDEF CPU64BITS} * 2{$ENDIF} - SizeOf(NativeInt);
 var
   RttiContext: TRttiContext;
   RttiType: TRttiType;
+  RequiredArrayLength: Extended;
 begin
   RttiContext := TRttiContext.Create;
   try
@@ -144,7 +147,13 @@ begin
         raise ESetTypeException.Create('Ordinal type expected');
       end;
     end;
-    if (FMax - FMin) > (MaxInt - SizeOf(Integer){$IFDEF CPU64BITS} * 2{$ENDIF} - SizeOf(NativeInt)) then
+    RequiredArrayLength := (Extended(FMax) - Extended(FMin) + Extended(1)) / 8;
+    if CompareValue(Frac(RequiredArrayLength), 0) = GreaterThanValue then
+    begin
+      RequiredArrayLength := RequiredArrayLength + 1;
+    end;
+    RequiredArrayLength := Int(RequiredArrayLength);
+    if RequiredArrayLength > MaxArraySize then
     begin
       raise ESetTypeException.Create('Range exceeds size constraints');
     end;
